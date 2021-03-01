@@ -1,0 +1,40 @@
+version: "3.3"
+
+# Create a backend network so only taco can communicate with redis and postgres
+networks:
+  backend:
+    driver: bridge
+
+# Define volumes for persistency
+volumes:
+  redis: {}
+  postgres: {}
+
+services:
+  taco:
+    # Use the image pushed by GitHub Actions on our fork
+    image: ghcr.io/dumbdogdiner/taco
+    restart: unless-stopped
+    networks:
+      - backend
+    ports:
+      - "6781:6781" # Expose port 6781 to the host
+  redis:
+    # available within this stack at redis://redis
+    image: redis:6-alpine
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      - redis:/data
+    command: ["redis-server", "--appendonly", "yes"]
+  postgres:
+    image: postgres
+    restart: always
+    networks:
+      - backend
+    volumes:
+      postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: trello
+      POSTGRES_PASSWORD: trello
