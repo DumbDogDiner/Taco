@@ -13,7 +13,6 @@ jobs:
       -
         name: Login to Docker Hub
         run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
-        if: github.ref == 'refs/heads/master'
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -33,5 +32,10 @@ jobs:
         run: |
           docker buildx build \
             --platform  linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x \
-            --output "type=image,push=$([[ $GITHUB_REF == "refs/heads/master" ]] && echo true || echo false)" \
-            -f Dockerfile -t ghcr.io/dumbdogdiner/taco:latest .
+            --output "type=image,push=true
+            -f Dockerfile -t ghcr.io/dumbdogdiner/taco:sha-$GITHUB_SHA .
+      - name: Tag and push build as latest (master branch only)
+        run: |
+          docker tag ghcr.io/dumbdogdiner/taco:sha-$GITHUB_SHA ghcr.io/dumbdogdiner/taco:latest
+          docker push ghcr.io/dumbdogdiner/taco:latest
+        if: github.ref == 'refs/heads/master'
