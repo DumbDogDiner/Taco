@@ -215,7 +215,7 @@ class TrelloBot extends Eris.Client {
           if (this.webserver) return this.webserver.stop();
         })
         .then(() => {
-          console.info("It's all gone...");
+          console.info('It\'s all gone...');
           resolve();
         });
       super.disconnect();
