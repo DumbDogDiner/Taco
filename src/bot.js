@@ -16,7 +16,13 @@ const CatLoggr = require('cat-loggr');
 class TrelloBot extends Eris.Client {
   constructor({ configPath, packagePath, mainDir } = {}) {
     // Initialization
-    const config = require(configPath || `${mainDir}/Config/`);
+    let config;
+    try {
+      config = require(configPath || `${mainDir}/Config/`);
+    } catch {
+      require('fs-extra').copySync(`${mainDir}/.Config/`, `${mainDir}/Config/`);
+      config = require(configPath || `${mainDir}/Config/`);
+    }
     const pkg = require(packagePath || `${mainDir}/package.json`);
     super(config.token, config.discordConfig);
     this.dir = mainDir;
@@ -34,8 +40,8 @@ class TrelloBot extends Eris.Client {
         { name: 'poster', color: CatLoggr._chalk.yellow.bgBlack },
         { name: 'debug', color: CatLoggr._chalk.magenta.bgBlack, aliases: ['log', 'dir'] },
         { name: 'limiter', color: CatLoggr._chalk.gray.bgBlack },
-        { name: 'fileload', color: CatLoggr._chalk.white.bgBlack }
-      ]
+        { name: 'fileload', color: CatLoggr._chalk.white.bgBlack },
+      ],
     });
     this.logger.setGlobal();
     this.config = config;
@@ -46,35 +52,29 @@ class TrelloBot extends Eris.Client {
     if (config.airbrake)
       this.airbrake = new Airbrake.Notifier({
         ...config.airbrake,
-        keysBlacklist: [
-          config.token,
-          config.redis.password,
-          config.pg.password,
-          config.trello.token,
-        ],
-        version: pkg.version
+        keysBlacklist: [config.token, config.redis.password, config.pg.password, config.trello.token],
+        version: pkg.version,
       });
 
-    if (this.config.webserver.enabled)
-      this.webserver = new Webserver(this);
+    if (this.config.webserver.enabled) this.webserver = new Webserver(this);
 
     // Events
     this.on('ready', () => console.info('All shards ready.'));
     this.on('disconnect', () => console.warn('All shards Disconnected.'));
     this.on('reconnecting', () => console.warn('Reconnecting client.'));
-    this.on('debug', message => console.debug(message));
+    this.on('debug', (message) => console.debug(message));
 
     // Shard Events
-    this.on('connect', id => console.info(`Shard ${id} connected.`));
+    this.on('connect', (id) => console.info(`Shard ${id} connected.`));
     this.on('error', (error, id) => console.error(`Error in shard ${id}`, error));
     this.on('hello', (_, id) => console.debug(`Shard ${id} recieved hello.`));
     this.on('warn', (message, id) => console.warn(`Warning in Shard ${id}`, message));
-    this.on('shardReady', id => console.info(`Shard ${id} ready.`));
-    this.on('shardResume', id => console.warn(`Shard ${id} resumed.`));
+    this.on('shardReady', (id) => console.info(`Shard ${id} ready.`));
+    this.on('shardResume', (id) => console.warn(`Shard ${id} resumed.`));
     this.on('shardDisconnect', (error, id) => console.warn(`Shard ${id} disconnected`, error));
 
     // SIGINT & uncaught exceptions
-    process.once('uncaughtException', async err => {
+    process.once('uncaughtException', async (err) => {
       console.error('Uncaught Exception', err.stack);
       await this.dieGracefully();
       process.exit(0);
@@ -90,16 +90,16 @@ class TrelloBot extends Eris.Client {
   }
 
   /**
-   * Creates a promise that resolves on the next event
-   * @param {string} event The event to wait for
-   */
+	 * Creates a promise that resolves on the next event
+	 * @param {string} event The event to wait for
+	 */
   waitTill(event) {
-    return new Promise(resolve => this.once(event, resolve));
+    return new Promise((resolve) => this.once(event, resolve));
   }
 
   /**
-   * Starts the processes and log-in to Discord.
-   */
+	 * Starts the processes and log-in to Discord.
+	 */
   async start() {
     // Redis
     this.db = new Database(this);
@@ -111,7 +111,7 @@ class TrelloBot extends Eris.Client {
 
     // Bottleneck
     this.limiterConnection = new Bottleneck.RedisConnection({
-      client: this.db.redis
+      client: this.db.redis,
     });
     this.limiter = new Bottleneck({
       // Per API key: https://help.trello.com/article/838-api-rate-limits
@@ -124,9 +124,9 @@ class TrelloBot extends Eris.Client {
       id: 'trello-bot',
       datastore: 'redis',
       clearDatastore: false,
-      connection: this.limiterConnection
+      connection: this.limiterConnection,
     });
-    this.limiter.on('error', err => console.error('Limiter Error', err));
+    this.limiter.on('error', (err) => console.error('Limiter Error', err));
     this.limiter.on('debug', (message, data) => console.limiter(message, data));
     await this.limiter.ready();
 
@@ -154,8 +154,7 @@ class TrelloBot extends Eris.Client {
     // Botlist poster
     if (Object.keys(this.config.botlists).length) this.initPoster();
 
-    if (this.webserver)
-      await this.webserver.start();
+    if (this.webserver) await this.webserver.start();
 
     if (this.config.influx.enabled) {
       this.stats.connect();
@@ -164,8 +163,8 @@ class TrelloBot extends Eris.Client {
   }
 
   /**
-   * @private
-   */
+	 * @private
+	 */
   initPoster() {
     this.poster = new dbots.Poster({
       client: this,
@@ -184,39 +183,39 @@ class TrelloBot extends Eris.Client {
   }
 
   /**
-   * @private
-   */
+	 * @private
+	 */
   onPost() {
     console.poster('Posted stats to all bot lists.');
   }
 
   /**
-   * @private
-   */
+	 * @private
+	 */
   onPostOne(result) {
     console.poster(`Posted to ${result.request.socket.servername}!`);
   }
 
   /**
-   * @private
-   */
+	 * @private
+	 */
   onPostFail(error, auto = false) {
     console.poster(`Failed to ${auto ? 'auto-post' : 'post'}`, error);
   }
 
   /**
-   * KIlls the bot
-   */
+	 * KIlls the bot
+	 */
   dieGracefully() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       console.info('Slowly dying...');
       this.waitTill('disconnect')
         .then(() => this.db.disconnect())
         .then(() => {
-          if (this.webserver)
-            return this.webserver.stop();
-        }).then(() => {
-          console.info('It\'s all gone...');
+          if (this.webserver) return this.webserver.stop();
+        })
+        .then(() => {
+          console.info("It's all gone...");
           resolve();
         });
       super.disconnect();
@@ -226,29 +225,32 @@ class TrelloBot extends Eris.Client {
   // Typing
 
   /**
-   * Start typing in a channel
-   * @param {Channel} channel The channel to start typing in
-   */
+	 * Start typing in a channel
+	 * @param {Channel} channel The channel to start typing in
+	 */
   async startTyping(channel) {
     if (this.isTyping(channel)) return;
     await channel.sendTyping();
-    this.typingIntervals.set(channel.id, setInterval(() => {
-      channel.sendTyping().catch(() => this.stopTyping(channel));
-    }, 5000));
+    this.typingIntervals.set(
+      channel.id,
+      setInterval(() => {
+        channel.sendTyping().catch(() => this.stopTyping(channel));
+      }, 5000),
+    );
   }
 
   /**
-   * Whether the bot is currently typing in a channel
-   * @param {Channel} channel
-   */
+	 * Whether the bot is currently typing in a channel
+	 * @param {Channel} channel
+	 */
   isTyping(channel) {
     return this.typingIntervals.has(channel.id);
   }
 
   /**
-   * Stops typing in a channel
-   * @param {Channel} channel
-   */
+	 * Stops typing in a channel
+	 * @param {Channel} channel
+	 */
   stopTyping(channel) {
     if (!this.isTyping(channel)) return;
     const interval = this.typingIntervals.get(channel.id);
@@ -258,7 +260,7 @@ class TrelloBot extends Eris.Client {
 }
 
 const Bot = new TrelloBot({ mainDir: path.join(__dirname, '..') });
-Bot.start().catch(e => {
+Bot.start().catch((e) => {
   Bot.logger.error('Failed to start bot! Exiting in 10 seconds...');
   console.error(e);
   setTimeout(() => process.exit(0), 10000);
